@@ -32,13 +32,52 @@ list_all_versions() {
 	list_github_tags
 }
 
-download_release() {
-	local version filename url
-	version="$1"
-	filename="$2"
+get_platform() {
+	local platform=""
 
-	# TODO: Adapt the release URL convention for bat
-	url="$GH_REPO/archive/v${version}.tar.gz"
+	case "$(uname -s)" in
+	Darwin)
+		platform="apple-darwin"
+		;;
+	Linux)
+		platform="unknown-linux-gnu"
+		;;
+	*)
+		fail "Platform '$(uname -s)' not supported!"
+		;;
+	esac
+
+	echo "$platform"
+}
+
+get_arch() {
+	local arch=""
+
+	case "$(uname -m)" in
+	x86_64 | amd64)
+		arch="x86_64"
+		;;
+	aarch64 | arm64)
+		arch="aarch64"
+		;;
+	*)
+		fail "Architecture '$(uname -m)' not supported!"
+		;;
+	esac
+
+	echo "$arch"
+}
+
+download_release() {
+	local version="$1"
+	local filename="$2"
+	local platform
+	local arch
+
+	platform=$(get_platform)
+	arch=$(get_arch)
+
+	local url="${GH_REPO}/releases/download/v${version}/${TOOL_NAME}-v${version}-${arch}-${platform}.tar.gz"
 
 	echo "* Downloading $TOOL_NAME release $version..."
 	curl "${curl_opts[@]}" -o "$filename" -C - "$url" || fail "Could not download $url"
@@ -47,20 +86,32 @@ download_release() {
 install_version() {
 	local install_type="$1"
 	local version="$2"
-	local install_path="${3%/bin}/bin"
+	local install_path="$3"
 
 	if [ "$install_type" != "version" ]; then
 		fail "asdf-$TOOL_NAME supports release installs only"
 	fi
 
 	(
-		mkdir -p "$install_path"
-		cp -r "$ASDF_DOWNLOAD_PATH"/* "$install_path"
+		mkdir -p "$install_path/bin"
+		cp -r "$ASDF_DOWNLOAD_PATH/bat" "$install_path/bin/"
+		chmod +x "$install_path/bin/bat"
 
-		# TODO: Assert bat executable exists.
+		# Copy man pages if they exist
+		if [ -d "$ASDF_DOWNLOAD_PATH/man" ]; then
+			mkdir -p "$install_path/share/man/man1"
+			cp -r "$ASDF_DOWNLOAD_PATH/man"/* "$install_path/share/man/man1/"
+		fi
+
+		# Copy completions if they exist
+		if [ -d "$ASDF_DOWNLOAD_PATH/autocomplete" ]; then
+			mkdir -p "$install_path/completions"
+			cp -r "$ASDF_DOWNLOAD_PATH/autocomplete"/* "$install_path/completions/"
+		fi
+
 		local tool_cmd
 		tool_cmd="$(echo "$TOOL_TEST" | cut -d' ' -f1)"
-		test -x "$install_path/$tool_cmd" || fail "Expected $install_path/$tool_cmd to be executable."
+		test -x "$install_path/bin/$tool_cmd" || fail "Expected $install_path/bin/$tool_cmd to be executable."
 
 		echo "$TOOL_NAME $version installation was successful!"
 	) || (
