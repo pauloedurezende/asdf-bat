@@ -11,7 +11,7 @@ Before testing locally, make sure you have:
 ## Testing Locally
 
 ```shell
-asdf plugin test bat /Users/pauloeduardorezende/workspace/asdf-bat --asdf-tool-version 0.25.0 "bat --version"
+asdf plugin test bat <path-to-plugin> --asdf-tool-version 0.25.0 "bat --version"
 ```
 
 **Note:** The test will compile bat from source code, which may take several minutes.
