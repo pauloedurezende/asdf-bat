@@ -2,7 +2,9 @@
 
 # asdf-bat [![Build](https://github.com/pauloedurezende/asdf-bat/actions/workflows/build.yml/badge.svg)](https://github.com/pauloedurezende/asdf-bat/actions/workflows/build.yml) [![Lint](https://github.com/pauloedurezende/asdf-bat/actions/workflows/lint.yml/badge.svg)](https://github.com/pauloedurezende/asdf-bat/actions/workflows/lint.yml)
 
-[bat](<TOOL HOMEPAGE>) plugin for the [asdf version manager](https://asdf-vm.com).
+[bat](https://github.com/sharkdp/bat) plugin for the [asdf version manager](https://asdf-vm.com).
+
+A cat clone with syntax highlighting and Git integration.
 
 </div>
 
@@ -15,10 +17,10 @@
 
 # Dependencies
 
-**TODO: adapt this section**
+- **Rust** (rustc and cargo) - Required for compiling bat from source code
+- `bash`, `curl`, `tar`, `git` and [POSIX utilities](https://pubs.opengroup.org/onlinepubs/9699919799/idx/utilities.html)
 
-- `bash`, `curl`, `tar`, and [POSIX utilities](https://pubs.opengroup.org/onlinepubs/9699919799/idx/utilities.html).
-- `SOME_ENV_VAR`: set this environment variable in your shell config to load the correct version of tool x.
+**Note:** This plugin compiles bat from source code, which may take a few minutes depending on your system. Make sure you have Rust installed before using this plugin.
 
 # Install
 
@@ -39,8 +41,11 @@ asdf list-all bat
 # Install specific version
 asdf install bat latest
 
-# Set a version globally (on your ~/.tool-versions file)
-asdf global bat latest
+# Show installed versions
+asdf list bat
+
+# Set a version globally (in your home ~/.tool-versions file)
+asdf set -u bat latest
 
 # Now bat commands are available
 bat --version
