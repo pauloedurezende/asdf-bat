@@ -2,7 +2,6 @@
 
 set -euo pipefail
 
-# TODO: Ensure this is the correct GitHub homepage where releases can be downloaded for bat.
 GH_REPO="https://github.com/sharkdp/bat"
 TOOL_NAME="bat"
 TOOL_TEST="bat --version"
@@ -14,7 +13,6 @@ fail() {
 
 curl_opts=(-fsSL)
 
-# NOTE: You might want to remove this if bat is not hosted on GitHub releases.
 if [ -n "${GITHUB_API_TOKEN:-}" ]; then
 	curl_opts=("${curl_opts[@]}" -H "Authorization: token $GITHUB_API_TOKEN")
 fi
@@ -27,12 +25,10 @@ sort_versions() {
 list_github_tags() {
 	git ls-remote --tags --refs "$GH_REPO" |
 		grep -o 'refs/tags/.*' | cut -d/ -f3- |
-		sed 's/^v//' # NOTE: You might want to adapt this sed to remove non-version strings from tags
+		sed 's/^v//'
 }
 
 list_all_versions() {
-	# TODO: Adapt this. By default we simply list the tag names from GitHub releases.
-	# Change this function if bat has other means of determining installable versions.
 	list_github_tags
 }
 
@@ -41,11 +37,64 @@ download_release() {
 	version="$1"
 	filename="$2"
 
-	# TODO: Adapt the release URL convention for bat
 	url="$GH_REPO/archive/v${version}.tar.gz"
 
 	echo "* Downloading $TOOL_NAME release $version..."
 	curl "${curl_opts[@]}" -o "$filename" -C - "$url" || fail "Could not download $url"
+}
+
+check_rust_dependencies() {
+	echo "* Checking Rust dependencies..."
+	if ! command -v cargo >/dev/null 2>&1; then
+		fail "cargo (Rust package manager) is required but not installed. Please install Rust from https://rustup.rs/"
+	fi
+	if ! command -v rustc >/dev/null 2>&1; then
+		fail "rustc (Rust compiler) is required but not installed. Please install Rust from https://rustup.rs/"
+	fi
+	echo "* Rust dependencies found"
+}
+
+compile_source() {
+	local source_path="$1"
+	echo "* Compiling $TOOL_NAME from source using Cargo..."
+	(
+		cd "$source_path"
+		cargo build --release || fail "Failed to compile $TOOL_NAME with cargo"
+	) || fail "Could not compile $TOOL_NAME"
+	echo "* Compilation completed successfully"
+}
+
+install_binary() {
+	local source_path="$1"
+	local install_path="$2"
+	local binary_name="$3"
+
+	echo "* Installing $TOOL_NAME binary..."
+	mkdir -p "$install_path"
+
+	local source_binary="$source_path/target/release/$binary_name"
+	local target_binary="$install_path/$binary_name"
+
+	if [ ! -f "$source_binary" ]; then
+		fail "Compiled binary not found at $source_binary"
+	fi
+
+	cp "$source_binary" "$target_binary" || fail "Failed to copy binary to install path"
+	chmod +x "$target_binary" || fail "Failed to make binary executable"
+
+	echo "* Binary installed successfully at $target_binary"
+}
+
+cleanup_build() {
+	local source_path="$1"
+	echo "* Cleaning up build artifacts..."
+	(
+		cd "$source_path"
+		if [ -d "target" ]; then
+			rm -rf target
+			echo "* Build artifacts cleaned up"
+		fi
+	) || echo "* Warning: Could not clean up build artifacts"
 }
 
 install_version() {
@@ -57,16 +106,27 @@ install_version() {
 		fail "asdf-$TOOL_NAME supports release installs only"
 	fi
 
-	(
-		mkdir -p "$install_path"
-		cp -r "$ASDF_DOWNLOAD_PATH"/* "$install_path"
+	echo "* Starting $TOOL_NAME $version installation from source..."
 
-		# TODO: Assert bat executable exists.
+	(
+		# Check dependencies
+		check_rust_dependencies
+
+		# Compile from source
+		compile_source "$ASDF_DOWNLOAD_PATH"
+
+		# Install binary
+		install_binary "$ASDF_DOWNLOAD_PATH" "$install_path" "bat"
+
+		# Verify installation
 		local tool_cmd
 		tool_cmd="$(echo "$TOOL_TEST" | cut -d' ' -f1)"
 		test -x "$install_path/$tool_cmd" || fail "Expected $install_path/$tool_cmd to be executable."
 
-		echo "$TOOL_NAME $version installation was successful!"
+		# Clean up build artifacts
+		cleanup_build "$ASDF_DOWNLOAD_PATH"
+
+		echo "* $TOOL_NAME $version installation was successful!"
 	) || (
 		rm -rf "$install_path"
 		fail "An error occurred while installing $TOOL_NAME $version."
